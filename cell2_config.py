@@ -1,7 +1,8 @@
 import os
 
 # ── PASTE YOUR API KEY BELOW ──────────────────────────────────────
-os.environ["ANTHROPIC_API_KEY"] =  "YOUR_KEY_HERE"
+from google.colab import userdata
+os.environ["ANTHROPIC_API_KEY"] = userdata.get('ANTHROPIC_API_KEY')
 # ─────────────────────────────────────────────────────────────────
 
 PAPER_TRADING       = True
