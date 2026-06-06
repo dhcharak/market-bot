@@ -81,24 +81,24 @@ def fetch_sports():
     try:
         results = []
         endpoints = [
-            ("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard","NBA"),
-            ("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard","MLB"),
+            ("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard", "NBA"),
+            ("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard", "MLB"),
         ]
         for url, league in endpoints:
             try:
                 r = requests.get(url, timeout=8, headers={"User-Agent":"Mozilla/5.0"})
                 data = r.json()
-                for ev in data.get("events", [])[:3]:
-                    comps = ev.get("competitions",[{}])[0]
-                    competitors = comps.get("competitors",[])
-                   status_obj = ev.get("status", {})
-status = status_obj.get("type",{}).get("description","")
-clock = status_obj.get("displayClock", "")
-period = status_obj.get("period", "")
-status_full = f"Period {period} | {clock} remaining | {status}"
+                for ev in data.get("events", [])[:5]:
+                    comps = ev.get("competitions", [{}])[0]
+                    competitors = comps.get("competitors", [])
+                    status_obj = ev.get("status", {})
+                    status = status_obj.get("type", {}).get("description", "")
+                    clock = status_obj.get("displayClock", "")
+                    period = status_obj.get("period", "")
+                    status_full = f"Period {period} | {clock} remaining | {status}"
                     if len(competitors) == 2:
                         t1, t2 = competitors[0], competitors[1]
-                       s = f"[{league}] {t1.get('team',{}).get('abbreviation','')} {t1.get('score','')} vs {t2.get('team',{}).get('abbreviation','')} {t2.get('score','')} | {status_full}"
+                        s = f"[{league}] {t1.get('team',{}).get('abbreviation','')} {t1.get('score','')} vs {t2.get('team',{}).get('abbreviation','')} {t2.get('score','')} | {status_full}"
                         results.append(s)
             except:
                 continue
