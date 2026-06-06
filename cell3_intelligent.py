@@ -341,5 +341,5 @@ def run_scan(scan_num):
 print("INTELLIGENT BOT FINAL VERSION LOADED")
 print("  Price-change triggered scanning")
 print("  Sports: clock + period + score in context")
-print("  Sports: only flags final 2 minutes opportunities")
-print("  Min volume: $200 | Price move threshold: 4%")
+print("  Sports: Claude judges timing naturally")
+print("  Min volume: $10,000 | Price move threshold: 4%")
