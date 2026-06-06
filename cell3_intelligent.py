@@ -9,12 +9,8 @@ GAMMA_API = "https://gamma-api.polymarket.com"
 client = anthropic.Anthropic()
 paper_trades = []
 seen_pairs = set()
-price_cache = {}  # stores last known prices
-PRICE_MOVE_THRESHOLD = 0.04  # 4% move triggers Claude analysis
-NEW_MARKET_CHECK_INTERVAL = 5  # check for new markets every 5 scans
-
-
-# ── DATA FETCHERS ─────────────────────────────────────────────────────────────
+price_cache = {}
+PRICE_MOVE_THRESHOLD = 0.04
 
 def fetch_crypto():
     try:
@@ -98,16 +94,17 @@ def fetch_sports():
                     status_full = f"Period {period} | {clock} remaining | {status}"
                     if len(competitors) == 2:
                         t1, t2 = competitors[0], competitors[1]
-                        s = f"[{league}] {t1.get('team',{}).get('abbreviation','')} {t1.get('score','')} vs {t2.get('team',{}).get('abbreviation','')} {t2.get('score','')} | {status_full}"
+                        t1_name = t1.get("team", {}).get("abbreviation", "")
+                        t1_score = t1.get("score", "")
+                        t2_name = t2.get("team", {}).get("abbreviation", "")
+                        t2_score = t2.get("score", "")
+                        s = f"[{league}] {t1_name} {t1_score} vs {t2_name} {t2_score} | {status_full}"
                         results.append(s)
             except:
                 continue
         return "SPORTS:\n" + "\n".join(results) if results else "SPORTS: no live games"
     except Exception as e:
         return f"SPORTS: unavailable ({e})"
-
-
-# ── MARKET FETCHER ────────────────────────────────────────────────────────────
 
 def fetch_markets(limit=MAX_MARKETS):
     try:
@@ -142,38 +139,23 @@ def build_summary(markets):
         })
     return summary
 
-
-# ── PRICE CHANGE DETECTOR ─────────────────────────────────────────────────────
-
 def find_changed_markets(summary):
-    """
-    Compare current prices to cached prices.
-    Returns markets that moved more than threshold + all new markets.
-    """
     changed = []
     new_markets = []
-
     for m in summary:
         mid = m["id"]
         current_price = m["y"]
-
         if mid not in price_cache:
-            # Brand new market we haven't seen before
             new_markets.append(m)
             price_cache[mid] = current_price
         else:
-            # Check if price moved significantly
             old_price = price_cache[mid]
             move = abs(current_price - old_price)
             if move >= PRICE_MOVE_THRESHOLD:
                 changed.append(m)
-                print(f"  PRICE MOVE: {m['q'][:50]} | {old_price*100:.0f}% -> {current_price*100:.0f}% (moved {move*100:.1f}%)")
+                print(f"  PRICE MOVE: {m['q'][:50]} | {old_price*100:.0f}% -> {current_price*100:.0f}%")
                 price_cache[mid] = current_price
-
     return changed, new_markets
-
-
-# ── CONTEXT BUILDER ───────────────────────────────────────────────────────────
 
 def claude_identify_needs(titles):
     try:
@@ -183,8 +165,7 @@ def claude_identify_needs(titles):
 {titles_text}
 
 Respond with ONLY this JSON:
-{{"need_crypto": true/false, "need_stocks": true/false, "need_sports": true/false, "need_news": true/false}}"""
-
+{{"need_crypto": true, "need_stocks": true, "need_sports": true, "need_news": true}}"""
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=100,
@@ -201,55 +182,44 @@ Respond with ONLY this JSON:
 
 def build_context(needs):
     sections = [f"DATE/TIME: {datetime.now().strftime('%A %B %d, %Y %H:%M UTC')}"]
-    if needs.get("need_crypto"): sections.append(fetch_crypto())
-    if needs.get("need_stocks"): sections.append(fetch_stocks())
-    if needs.get("need_news"): sections.append(fetch_news())
-    if needs.get("need_sports"): sections.append(fetch_sports())
+    if needs.get("need_crypto"):
+        sections.append(fetch_crypto())
+    if needs.get("need_stocks"):
+        sections.append(fetch_stocks())
+    if needs.get("need_news"):
+        sections.append(fetch_news())
+    if needs.get("need_sports"):
+        sections.append(fetch_sports())
     return "\n\n".join(sections)
 
-
-# ── CLAUDE ANALYSIS ───────────────────────────────────────────────────────────
-
 def ask_claude(markets_to_analyze, all_markets, context):
-    """
-    Analyze changed/new markets against all markets for logical arbitrage.
-    """
     if not markets_to_analyze:
         return []
-
-    all_opps = []
-
-    # For each changed market, find related markets and analyze together
-    changed_ids = {m["id"] for m in markets_to_analyze}
-
-    # Build full market list for context
     all_text = "\n".join([
         f"{m['y']*100:.0f}% YES | vol:${m['vol']:,} | {m['q']} | id={m['id']}"
         for m in all_markets
     ])
-
-    # Focus markets that triggered the scan
     focus_text = "\n".join([
-        f"*** PRICE MOVED: {m['y']*100:.0f}% YES | {m['q']} | id={m['id']}"
+        f"*** TRIGGERED: {m['y']*100:.0f}% YES | {m['q']} | id={m['id']}"
         for m in markets_to_analyze
     ])
-
     prompt = f"""You are a prediction market arbitrage expert.
 
 REAL WORLD CONTEXT:
 {context}
 
-MARKETS THAT JUST MOVED IN PRICE (focus here):
+MARKETS THAT TRIGGERED THIS SCAN:
 {focus_text}
 
 ALL ACTIVE MARKETS FOR COMPARISON:
 {all_text}
 
-For each market that moved, check:
-1. LOGICAL_ARBITRAGE: Is it now priced inconsistently with a related market?
-   Example: If "BTC above $70k" just dropped but "BTC above $68k" is still high = arbitrage
-2. REALITY_MISPRICING: Does the new price conflict with real-world facts in the context?
-   Example: Market moved to 60% but context shows the event already happened/failed
+Find opportunities:
+1. LOGICAL_ARBITRAGE: Mathematically impossible pricing between related markets
+2. REALITY_MISPRICING: Market price conflicts with real-world context above
+   - For sports: ONLY flag if game is in final 2 minutes of 4th quarter or final inning
+   - For crypto: Use actual prices from context
+   - For news: Use breaking headlines to assess probability
 
 Return ONLY valid JSON array:
 [
@@ -264,7 +234,7 @@ Return ONLY valid JSON array:
     "action": "buy_no_A or buy_yes_A or buy_no_B or buy_yes_B",
     "edge": 0.15,
     "conf": 0.80,
-    "reason": "specific reason with numbers"
+    "reason": "specific reason with time remaining and score if sports"
   }}
 ]
 
@@ -296,12 +266,10 @@ Only include edge >= 0.08 AND conf >= 0.60. If nothing qualifies return: []"""
         print(f"  Claude error: {e}")
     return []
 
-
-# ── POSITION SIZING + DISPLAY ─────────────────────────────────────────────────
-
 def kelly_size(edge, conf):
     adj = edge * conf
-    if adj <= 0: return 0
+    if adj <= 0:
+        return 0
     k = (adj / (1 - adj)) * KELLY_FRACTION
     return round(min(BANKROLL * k, MAX_POSITION), 2)
 
@@ -319,64 +287,39 @@ def show_opportunity(opp, position):
     print(f"  Reason   : {opp.get('reason','')}")
     print("="*62)
 
-
-# ── MAIN SCAN LOOP ────────────────────────────────────────────────────────────
-
-scan_count = 0
-
 def run_scan(scan_num):
-    global scan_count
-    scan_count += 1
-
     print(f"\n{'─'*62}")
     print(f"  SCAN #{scan_num} | {datetime.now().strftime('%H:%M:%S')}")
     print(f"{'─'*62}")
-
-    # Fetch all markets
     markets = fetch_markets()
     if not markets:
         return 0
     summary = build_summary(markets)
     print(f"  {len(summary)} markets with volume > $200")
-
-    # Find what changed since last scan
     changed, new_markets = find_changed_markets(summary)
-
     total_triggers = len(changed) + len(new_markets)
-
     if new_markets:
         print(f"  {len(new_markets)} NEW markets discovered")
     if changed:
         print(f"  {len(changed)} markets with significant price moves")
-
     if total_triggers == 0:
-        print(f"  No price moves or new markets — skipping Claude (saving cost)")
-        print(f"  Cache: {len(price_cache)} markets tracked")
+        print(f"  No changes — skipping Claude | Cache: {len(price_cache)} markets tracked")
         return 0
-
-    # Only call Claude when something actually changed
     print(f"  Triggered! Calling Claude to analyze {total_triggers} markets...")
     markets_to_analyze = changed + new_markets
-
-    # Build context
     titles = [m["q"] for m in markets_to_analyze]
     needs = claude_identify_needs(titles)
     context = build_context(needs)
-
-    # Ask Claude
     opps = ask_claude(markets_to_analyze, summary, context)
-
     new_count = 0
     for opp in opps:
         edge = float(opp.get("edge", 0))
         conf = float(opp.get("conf", 0))
         if edge < 0.08 or conf < 0.6:
             continue
-
         pair_key = tuple(sorted([opp.get("a_q","")[:50], opp.get("b_q","")[:50]]))
         if pair_key in seen_pairs:
             continue
-
         seen_pairs.add(pair_key)
         pos = kelly_size(edge, conf)
         show_opportunity(opp, pos)
@@ -393,12 +336,11 @@ def run_scan(scan_num):
             "reason": opp.get("reason","")
         })
         new_count += 1
-
     print(f"  {new_count} new opportunities logged")
     return new_count
 
-print("INTELLIGENT BOT V2 LOADED")
-print("  Price-change triggered - Claude only called when markets move")
-print("  Tracks price cache across all scans")
-print("  New market detection every scan")
+print("INTELLIGENT BOT FINAL VERSION LOADED")
+print("  Price-change triggered scanning")
+print("  Sports: clock + period + score in context")
+print("  Sports: only flags final 2 minutes opportunities")
 print("  Min volume: $200 | Price move threshold: 4%")
