@@ -127,15 +127,26 @@ def build_summary(markets):
             yes_price = float(prices[0]) if prices else 0.5
         except:
             yes_price = 0.5
-        vol = float(m.get("volume", 0) or 0)
-        if vol < 10000:
+        
+        # Three quality filters
+        total_vol = float(m.get("volume", 0) or 0)
+        vol_24hr = float(m.get("volume24hr", 0) or 0)
+        
+        # Filter 1: Must have real price discovery (total volume > $5,000)
+        if total_vol < 5000:
             continue
+            
+        # Filter 2: Skip exact 50/50 default placeholders
+        if yes_price == 0.5 and total_vol < 10000:
+            continue
+        
         q = m.get("question","").replace('"',"'").replace('\n',' ')[:100]
         summary.append({
             "id": m.get("conditionId","")[:16],
             "q": q,
             "y": round(yes_price, 2),
-            "vol": round(vol)
+            "vol": round(total_vol),
+            "vol_24hr": round(vol_24hr)
         })
     return summary
 
