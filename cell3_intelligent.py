@@ -2,7 +2,7 @@ import requests
 import json
 import time
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import anthropic
 
 GAMMA_API = "https://gamma-api.polymarket.com"
@@ -127,19 +127,12 @@ def build_summary(markets):
             yes_price = float(prices[0]) if prices else 0.5
         except:
             yes_price = 0.5
-        
-        # Three quality filters
         total_vol = float(m.get("volume", 0) or 0)
         vol_24hr = float(m.get("volume24hr", 0) or 0)
-        
-        # Filter 1: Must have real price discovery (total volume > $5,000)
         if total_vol < 5000:
             continue
-            
-        # Filter 2: Skip exact 50/50 default placeholders
         if yes_price == 0.5 and total_vol < 10000:
             continue
-        
         q = m.get("question","").replace('"',"'").replace('\n',' ')[:100]
         summary.append({
             "id": m.get("conditionId","")[:16],
@@ -192,7 +185,9 @@ Respond with ONLY this JSON:
     return {"need_crypto":True,"need_stocks":True,"need_sports":True,"need_news":True}
 
 def build_context(needs):
-    sections = [f"DATE/TIME: {datetime.now().strftime('%A %B %d, %Y %H:%M UTC')}"]
+    ast_tz = timezone(timedelta(hours=-4))
+    now_ast = datetime.now(ast_tz)
+    sections = [f"DATE/TIME: {now_ast.strftime('%A %B %d, %Y %H:%M')} Puerto Rico Time (AST)"]
     if needs.get("need_crypto"):
         sections.append(fetch_crypto())
     if needs.get("need_stocks"):
@@ -207,7 +202,7 @@ def ask_claude(markets_to_analyze, all_markets, context):
     if not markets_to_analyze:
         return []
     all_text = "\n".join([
-        f"{m['y']*100:.0f}% YES | vol:${m['vol']:,} | {m['q']} | id={m['id']}"
+        f"{m['y']*100:.0f}% YES | vol:${m['vol']:,} | 24h:${m['vol_24hr']:,} | {m['q']} | id={m['id']}"
         for m in all_markets
     ])
     focus_text = "\n".join([
@@ -228,8 +223,9 @@ ALL ACTIVE MARKETS FOR COMPARISON:
 Find opportunities:
 1. LOGICAL_ARBITRAGE: Mathematically impossible pricing between related markets
 2. REALITY_MISPRICING: Market price conflicts with real-world context above
+   - For sports: Use score and time remaining to assess win probability naturally
    - For crypto: Use actual prices from context
-   - For news: Use breaking headlines to assess probability
+   - For news: Use breaking headlines and deadlines vs current date/time
 
 Return ONLY valid JSON array:
 [
@@ -244,7 +240,7 @@ Return ONLY valid JSON array:
     "action": "buy_no_A or buy_yes_A or buy_no_B or buy_yes_B",
     "edge": 0.15,
     "conf": 0.80,
-    "reason": "specific reason with time remaining and score if sports"
+    "reason": "specific reason with data from context"
   }}
 ]
 
@@ -305,7 +301,7 @@ def run_scan(scan_num):
     if not markets:
         return 0
     summary = build_summary(markets)
-   print(f"  {len(summary)} markets with total volume > $5,000")
+    print(f"  {len(summary)} markets with total volume > $5,000")
     changed, new_markets = find_changed_markets(summary)
     total_triggers = len(changed) + len(new_markets)
     if new_markets:
@@ -349,8 +345,9 @@ def run_scan(scan_num):
     print(f"  {new_count} new opportunities logged")
     return new_count
 
-print("INTELLIGENT BOT FINAL VERSION LOADED")
+print("POLYMARKET BOT V3 LOADED")
 print("  Price-change triggered scanning")
 print("  Sports: clock + period + score in context")
 print("  Sports: Claude judges timing naturally")
-print("  Min total volume: $5,000 | Skips exact 50/50 defaults under $10k")
+print("  Min total volume: $5,000 | Skips 50/50 defaults under $10k")
+print("  Timezone: Puerto Rico AST (UTC-4)")
