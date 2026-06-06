@@ -128,7 +128,7 @@ def build_summary(markets):
         except:
             yes_price = 0.5
         vol = float(m.get("volume", 0) or 0)
-        if vol < 200:
+        if vol < 10000:
             continue
         q = m.get("question","").replace('"',"'").replace('\n',' ')[:100]
         summary.append({
