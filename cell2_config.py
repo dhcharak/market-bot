@@ -10,7 +10,7 @@ BANKROLL            = 5000
 MIN_EDGE            = 0.10
 KELLY_FRACTION      = 0.25
 MAX_POSITION        = 500
-MAX_MARKETS         = 200
+MAX_MARKETS         = 500
 SCANS_TO_RUN        = 999
 SCAN_PAUSE_SECONDS  = 30
 
