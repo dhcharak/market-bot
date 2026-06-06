@@ -305,7 +305,7 @@ def run_scan(scan_num):
     if not markets:
         return 0
     summary = build_summary(markets)
-    print(f"  {len(summary)} markets with volume > $200")
+   print(f"  {len(summary)} markets with total volume > $5,000")
     changed, new_markets = find_changed_markets(summary)
     total_triggers = len(changed) + len(new_markets)
     if new_markets:
