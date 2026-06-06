@@ -1,7 +1,7 @@
 import os
 
 # ── PASTE YOUR API KEY BELOW ──────────────────────────────────────
-os.environ["ANTHROPIC_API_KEY"] = "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"
+os.environ["ANTHROPIC_API_KEY"] =  "YOUR_KEY_HERE"
 # ─────────────────────────────────────────────────────────────────
 
 PAPER_TRADING       = True
