@@ -91,10 +91,14 @@ def fetch_sports():
                 for ev in data.get("events", [])[:3]:
                     comps = ev.get("competitions",[{}])[0]
                     competitors = comps.get("competitors",[])
-                    status = ev.get("status",{}).get("type",{}).get("description","")
+                   status_obj = ev.get("status", {})
+status = status_obj.get("type",{}).get("description","")
+clock = status_obj.get("displayClock", "")
+period = status_obj.get("period", "")
+status_full = f"Period {period} | {clock} remaining | {status}"
                     if len(competitors) == 2:
                         t1, t2 = competitors[0], competitors[1]
-                        s = f"[{league}] {t1.get('team',{}).get('abbreviation','')} {t1.get('score','')} vs {t2.get('team',{}).get('abbreviation','')} {t2.get('score','')} ({status})"
+                       s = f"[{league}] {t1.get('team',{}).get('abbreviation','')} {t1.get('score','')} vs {t2.get('team',{}).get('abbreviation','')} {t2.get('score','')} | {status_full}"
                         results.append(s)
             except:
                 continue
