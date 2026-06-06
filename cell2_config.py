@@ -11,7 +11,7 @@ MIN_EDGE            = 0.10
 KELLY_FRACTION      = 0.25
 MAX_POSITION        = 500
 MAX_MARKETS         = 200
-SCANS_TO_RUN        = 10
+SCANS_TO_RUN        = 999
 SCAN_PAUSE_SECONDS  = 30
 
 print("✅ Config ready")
