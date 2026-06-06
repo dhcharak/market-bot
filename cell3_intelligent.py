@@ -217,7 +217,6 @@ ALL ACTIVE MARKETS FOR COMPARISON:
 Find opportunities:
 1. LOGICAL_ARBITRAGE: Mathematically impossible pricing between related markets
 2. REALITY_MISPRICING: Market price conflicts with real-world context above
-   - For sports: ONLY flag if game is in final 2 minutes of 4th quarter or final inning
    - For crypto: Use actual prices from context
    - For news: Use breaking headlines to assess probability
 
